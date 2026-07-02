@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PT 타이머 ⌚</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#000;--surface:#111;--border:#222;
+  --green:#22c55e;--amber:#f59e0b;--red:#ef4444;
+  --blue:#3b82f6;--violet:#a78bfa;--orange:#fb923c;
+  --traction:#10b981;--muted:#555;--text:#eee;
+}
+
+html{background:var(--bg)}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:-apple-system,sans-serif;
+  padding:6px 5px 20px;
+  min-height:100vh;
+}
+
+/* 헤더 */
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 2px 6px;border-bottom:1px solid var(--border);margin-bottom:6px;
+}
+.hdr-title{font-size:.7rem;font-weight:700;color:var(--blue)}
+.hdr-clock{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--muted)}
+
+/* 섹션 레이블 */
+.section-label{
+  font-size:.52rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);padding:5px 2px 3px;
+}
+
+/* 카드 */
+.card{
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:10px;padding:7px 10px 8px;
+  margin-bottom:4px;cursor:pointer;
+  display:flex;align-items:center;justify-content:space-between;
+  position:relative;overflow:hidden;
+  transition:border-color .2s,box-shadow .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  opacity:0;transition:opacity .3s;pointer-events:none;
+}
+
+.card.idle:active{border-color:var(--blue)}
+.card.running{border-color:var(--green);box-shadow:0 0 0 2px rgba(34,197,94,.2)}
+.card.running::before{background:radial-gradient(ellipse at left,rgba(34,197,94,.12),transparent 70%);opacity:1}
+.card.warning{border-color:var(--amber);box-shadow:0 0 0 2px rgba(245,158,11,.2)}
+.card.warning::before{background:radial-gradient(ellipse at left,rgba(245,158,11,.12),transparent 70%);opacity:1}
+.card.done{border-color:var(--red);box-shadow:0 0 0 3px rgba(239,68,68,.2);animation:pulse 1.2s ease-in-out infinite}
+.card.done::before{background:radial-gradient(ellipse at left,rgba(239,68,68,.15),transparent 70%);opacity:1}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 2px rgba(239,68,68,.2)}50%{box-shadow:0 0 0 5px rgba(239,68,68,.07)}}
+
+/* CPM 알약 */
+.card.cpm-lt{border-radius:30px;border-color:#3d3060;background:linear-gradient(135deg,#1c1428,#111)}
+.card.cpm-lt.running{border-color:var(--violet);box-shadow:0 0 0 2px rgba(167,139,250,.2)}
+.card.cpm-rt{border-radius:30px;border-color:#4a2e0e;background:linear-gradient(135deg,#1c1208,#111)}
+.card.cpm-rt.running{border-color:var(--orange);box-shadow:0 0 0 2px rgba(251,146,60,.2)}
+
+/* Traction 비대칭 */
+.card.traction{border-radius:6px 18px 6px 18px;border-color:#0d6e52;background:linear-gradient(135deg,#0d1f1a,#111)}
+.card.traction.running{border-color:var(--traction);box-shadow:0 0 0 2px rgba(16,185,129,.2)}
+
+/* 카드 좌측 */
+.card-left{display:flex;flex-direction:column;gap:2px}
+.card-num{font-size:.65rem;font-weight:700;color:var(--muted)}
+.card-num b{font-size:.9rem;color:var(--text);font-weight:900}
+.card-treat{font-size:.55rem;font-weight:700;color:var(--muted)}
+.running .card-treat{color:rgba(34,197,94,.8)}
+.warning .card-treat{color:rgba(245,158,11,.8)}
+.done .card-treat{color:rgba(239,68,68,.7)}
+.card.cpm-lt.running .card-treat{color:rgba(167,139,250,.8)}
+.card.cpm-rt.running .card-treat{color:rgba(251,146,60,.8)}
+.card.traction.running .card-treat{color:rgba(16,185,129,.8)}
+
+/* 카드 우측 */
+.card-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.card-remain{
+  font-family:'JetBrains Mono',monospace;
+  font-size:1.25rem;font-weight:800;color:var(--muted);line-height:1;
+}
+.running .card-remain{color:var(--green)}
+.warning .card-remain{color:var(--amber)}
+.done .card-remain{color:var(--red)}
+.card.cpm-lt.running .card-remain{color:var(--violet)}
+.card.cpm-rt.running .card-remain{color:var(--orange)}
+.card.traction.running .card-remain{color:var(--traction)}
+
+.card-endtime{
+  font-family:'JetBrains Mono',monospace;
+  font-size:.6rem;font-weight:700;color:var(--muted);line-height:1;
+}
+.running .card-endtime,.warning .card-endtime{color:rgba(255,255,255,.35)}
+.done .card-endtime{color:rgba(239,68,68,.55)}
+
+.card-badge{
+  font-size:.45rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:1px 5px;border-radius:20px;background:#222;color:var(--muted);
+}
+.running .card-badge{background:rgba(34,197,94,.15);color:var(--green)}
+.warning .card-badge{background:rgba(245,158,11,.15);color:var(--amber)}
+.done .card-badge{background:rgba(239,68,68,.18);color:var(--red)}
+.card.cpm-lt.running .card-badge{background:rgba(167,139,250,.15);color:var(--violet)}
+.card.cpm-rt.running .card-badge{background:rgba(251,146,60,.15);color:var(--orange)}
+.card.traction.running .card-badge{background:rgba(16,185,129,.15);color:var(--traction)}
+
+/* 진행바 */
+.card-prog{position:absolute;bottom:0;left:0;right:0;height:2px;background:#222}
+.card-prog-fill{height:100%;border-radius:99px;background:#333;transition:width .95s linear}
+.running .card-prog-fill{background:var(--green)}
+.warning .card-prog-fill{background:var(--amber)}
+.done .card-prog-fill{background:var(--red);width:0!important}
+.card.cpm-lt.running .card-prog-fill{background:var(--violet)}
+.card.cpm-rt.running .card-prog-fill{background:var(--orange)}
+.card.traction.running .card-prog-fill{background:var(--traction)}
+
+/* 만료 큐 */
+.queue-section{margin-top:8px}
+.queue-title{font-size:.52rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 2px 4px}
+.queue-item{
+  background:rgba(239,68,68,.08);border:1.5px solid var(--red);
+  border-radius:8px;padding:5px 10px;margin-bottom:3px;
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;animation:pulse 1.5s ease-in-out infinite;
+}
+.queue-item-left{display:flex;flex-direction:column;gap:1px}
+.queue-rank{font-size:.45rem;font-weight:700;color:rgba(239,68,68,.6);letter-spacing:.05em}
+.queue-num{font-size:.75rem;font-weight:900;color:var(--red)}
+.queue-over{font-family:'JetBrains Mono',monospace;font-size:.62rem;font-weight:700;color:rgba(239,68,68,.7)}
+.queue-item-running{
+  background:var(--surface);border-color:var(--border);animation:none;cursor:default;
+}
+.queue-item-running .queue-rank{color:var(--muted)}
+.queue-item-running .queue-num{color:var(--text)}
+.queue-over.running-time{color:var(--green)}
+.queue-empty{font-size:.58rem;color:#333;text-align:center;padding:8px 0}
+
+/* 모달 */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);
+  backdrop-filter:blur(3px);z-index:100;
+  align-items:flex-end;justify-content:center;padding:0;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:#111;border:1.5px solid #333;
+  border-radius:16px 16px 0 0;
+  padding:14px 12px 24px;width:100%;
+  animation:slideUp .25s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-title{font-size:.85rem;font-weight:700;color:#fff;margin-bottom:2px}
+.modal-sub{font-size:.6rem;color:var(--muted);margin-bottom:10px}
+.time-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.time-btn{
+  background:#1a1a1a;border:1.5px solid #333;border-radius:10px;
+  padding:10px 6px;color:#fff;font-family:'JetBrains Mono',monospace;
+  font-size:1.2rem;font-weight:800;
+  display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;
+}
+.time-btn span{font-family:-apple-system,sans-serif;font-size:.5rem;font-weight:500;color:var(--muted)}
+.time-btn:active{border-color:var(--blue);background:rgba(59,130,246,.1)}
+
+/* 드래그 슬라이더 */
+.custom-row{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.drag-wrap{
+  flex:1;display:flex;align-items:center;gap:6px;
+  background:#1a1a1a;border:1.5px solid #333;border-radius:9px;padding:6px 8px;
+}
+.drag-val{font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:800;color:#fff;min-width:2ch;text-align:center}
+.drag-unit{font-size:.55rem;color:var(--muted)}
+.drag-track{flex:1;height:32px;position:relative;cursor:ew-resize;display:flex;align-items:center;touch-action:none}
+.drag-bg{position:absolute;left:0;right:0;height:3px;background:#333;border-radius:99px}
+.drag-fill{position:absolute;left:0;height:3px;background:var(--blue);border-radius:99px}
+.drag-thumb{position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;transform:translateX(-50%);box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.start-btn{
+  padding:8px 12px;border-radius:9px;border:1.5px solid var(--blue);
+  background:rgba(59,130,246,.12);color:var(--blue);
+  font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+.modal-actions{display:flex;gap:6px;margin-top:4px}
+.btn-cancel,.btn-stop{
+  flex:1;padding:9px;border-radius:9px;border:1.5px solid #333;
+  background:transparent;color:var(--muted);font-size:.72rem;font-weight:600;cursor:pointer;
+}
+.btn-stop{border-color:rgba(239,68,68,.4);color:var(--red)}
+.drag-hint{font-size:.48rem;color:var(--muted);text-align:center;margin-bottom:5px}
+.divider-row{display:flex;align-items:center;gap:6px;margin:6px 0}
+.divider-line{flex:1;height:1px;background:#222}
+.divider-lbl{font-size:.48rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+
+/* 편집 모드 */
+.edit-btn{background:none;border:none;font-size:.52rem;color:var(--muted);cursor:pointer;padding:1px 3px;font-weight:600}
+.edit-tip{font-size:.52rem;color:var(--amber);text-align:center;margin:-2px 0 5px;font-weight:600}
+.time-btn.editing{border-color:var(--amber);background:rgba(245,158,11,.07);position:relative}
+.edit-hint-badge{position:absolute;top:3px;right:4px;font-size:.38rem;color:var(--amber);font-weight:700}
+
+/* 편집 팝업 */
+.edit-popup{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;background:rgba(0,0,0,.8)}
+.edit-popup.open{display:flex}
+.edit-box{background:#1a1a1a;border:1.5px solid var(--amber);border-radius:14px;padding:16px 14px 12px;width:85%}
+.edit-box h3{font-size:.78rem;font-weight:700;color:var(--amber);margin-bottom:10px}
+.edit-row{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+.edit-row label{font-size:.55rem;color:var(--muted);font-weight:600}
+.edit-field{background:#111;border:1.5px solid #333;border-radius:7px;padding:6px 8px;color:#fff;font-size:.8rem;font-weight:600;width:100%;outline:none}
+.edit-field:focus{border-color:var(--amber)}
+.edit-actions{display:flex;gap:6px;margin-top:4px}
+.btn-edit-save{flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--amber);background:rgba(245,158,11,.12);color:var(--amber);font-size:.7rem;font-weight:700;cursor:pointer}
+.btn-edit-cancel{flex:1;padding:8px;border-radius:8px;border:1.5px solid #333;background:transparent;color:var(--muted);font-size:.7rem;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-title">⚡ PT 전기치료</div>
+  <div class="hdr-clock" id="clock"></div>
+</div>
+
+<!-- 방 목록 -->
+<div id="roomList"></div>
+
+<!-- 만료 큐 -->
+<div class="queue-section">
+  <div class="queue-title">⏰ 만료 순서</div>
+  <div id="queueList"><div class="queue-empty" id="queueEmpty">진행중인 방 없음</div></div>
+</div>
+
+<!-- 모달 -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-sub" id="modalSub">치료 시간을 선택하세요</div>
+    <div id="modalBtns" class="time-grid"></div>
+    <div class="edit-tip" id="editTip" style="display:none">✏️ 버튼을 탭하여 편집</div>
+    <div style="display:flex;justify-content:flex-end;margin:-2px 0 5px">
+      <button class="edit-btn" id="editModeBtn" onclick="toggleEditMode()">✏️ 편집</button>
+    </div>
+    <div class="divider-row"><div class="divider-line"></div><div class="divider-lbl">직접 설정</div><div class="divider-line"></div></div>
+    <div class="drag-hint">← 드래그하여 조절 →</div>
+    <div class="custom-row">
+      <div class="drag-wrap">
+        <div class="drag-val" id="dragVal">10</div>
+        <div class="drag-unit">분</div>
+        <div class="drag-track" id="dragTrack">
+          <div class="drag-bg"></div>
+          <div class="drag-fill" id="dragFill"></div>
+          <div class="drag-thumb" id="dragThumb"></div>
+        </div>
+      </div>
+      <button class="start-btn" onclick="startDragTimer()">시작</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">닫기</button>
+      <button class="btn-stop" id="stopBtn" onclick="stopTimer()" style="display:none">중지</button>
+    </div>
+  </div>
+</div>
+
+<!-- 편집 팝업 -->
+<div class="edit-popup" id="editPopup">
+  <div class="edit-box">
+    <h3>⏱ 버튼 편집</h3>
+    <div class="edit-row"><label>시간 (분)</label><input class="edit-field" id="editMin" type="number" min="1" max="99"></div>
+    <div class="edit-row"><label>이름</label><input class="edit-field" id="editLabel" type="text" maxlength="8"></div>
+    <div class="edit-actions">
+      <button class="btn-edit-cancel" onclick="closeEditPopup()">취소</button>
+      <button class="btn-edit-save" onclick="saveEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 레이아웃 ──
+const SECTIONS = [
+  { label: null, rooms: [
+    {id:13,type:'elec'},{id:12,type:'elec'},{id:11,type:'elec'},{id:10,type:'elec'}
+  ]},
+  { label: '── Traction', labelColor:'#10b981', rooms: [
+    {id:'tr-9',type:'traction',short:'9',sub:'Traction'},
+    {id:'tr-8',type:'traction',short:'8',sub:'Traction'},
+  ]},
+  { label: '── CPM', labelColor:'#a78bfa', rooms: [
+    {id:'lt-cpm',type:'cpm-lt',short:'Lt',sub:'Shoulder CPM'},
+    {id:'rt-cpm',type:'cpm-rt',short:'Rt',sub:'Shoulder CPM'},
+  ]},
+  { label: '── 전기치료', labelColor:'#3b82f6', rooms: [
+    {id:15,type:'elec'},{id:16,type:'elec'},{id:17,type:'elec'},{id:19,type:'elec'},
+    {id:20,type:'elec'},{id:21,type:'elec'},{id:22,type:'elec'},{id:23,type:'elec'},
+    {id:25,type:'elec'},{id:26,type:'elec'},{id:27,type:'elec'},{id:29,type:'elec'},
+  ]},
+];
+const ALL_ROOMS = SECTIONS.flatMap(s=>s.rooms.map(r=>r.id));
+const WARN_SECS = 60;
+
+// ── 버튼 설정 ──
+const BTN_KEYS = { elec:'w_elec_btns_v1', traction:'w_tr_btns_v1', cpm:'w_cpm_btns_v1' };
+const BTN_DEFAULTS = {
+  elec: [{min:14,label:'ICT치료'},{min:15,label:'핫팩'},{min:19,label:'TENS패치'},{min:20,label:'기타'}],
+  traction: [{min:13,label:'Traction'}],
+  cpm: [{min:20,label:'CPM'}],
+};
+function loadBtns(type){ try{return JSON.parse(localStorage.getItem(BTN_KEYS[type]))||BTN_DEFAULTS[type];}catch(e){return BTN_DEFAULTS[type];} }
+function saveBtns(type,b){ try{localStorage.setItem(BTN_KEYS[type],JSON.stringify(b));}catch(e){} }
+const btns = { elec:loadBtns('elec'), traction:loadBtns('traction'), cpm:loadBtns('cpm') };
+
+// ── 상태 ──
+const state = {};
+ALL_ROOMS.forEach(id=>{
+  state[id]={endEpoch:null,totalSecs:0,overSecs:0,treatLabel:'',status:'idle',rafId:null,vibId:null};
+});
+
+let currentRoom=null, editMode=false, editingType=null, editingIdx=null;
+let dragVal=10;
+let vibrationOn=true;
+
+// ── 저장/복구 ──
+const STORAGE_KEY='pt_watch_state_v1';
+function saveState(){
+  try{
+    const d={};
+    ALL_ROOMS.forEach(id=>{
+      const s=state[id];
+      if(s.status!=='idle'&&s.endEpoch) d[id]={endEpoch:s.endEpoch,totalSecs:s.totalSecs,treatLabel:s.treatLabel};
+    });
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(d));
+  }catch(e){}
+}
+function restoreState(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    const now=Date.now();
+    ALL_ROOMS.forEach(id=>{
+      if(!d[id])return;
+      const{endEpoch,totalSecs,treatLabel}=d[id];
+      const s=state[id];
+      s.endEpoch=endEpoch; s.totalSecs=totalSecs; s.treatLabel=treatLabel||'';
+      s.status=now>=endEpoch?'done':(endEpoch-now)/1000<=WARN_SECS?'warning':'running';
+      s.overSecs=now>=endEpoch?Math.floor((now-endEpoch)/1000):0;
+      tickRoom(id); updateCard(id);
+    });
+    renderQueue();
+  }catch(e){}
+}
+
+// ── 빌드 ──
+function build(){
+  const list=document.getElementById('roomList');
+  list.innerHTML='';
+  SECTIONS.forEach(sec=>{
+    if(sec.label){
+      const lbl=document.createElement('div');
+      lbl.className='section-label';
+      lbl.style.color=sec.labelColor||'#555';
+      lbl.textContent=sec.label;
+      list.appendChild(lbl);
+    }
+    sec.rooms.forEach(r=>{
+      const id=r.id;
+      const card=document.createElement('div');
+      card.className=`card idle ${r.type}`;
+      card.id=`card-${id}`;
+      card.onclick=()=>onCardClick(id,r.type);
+
+      const numHtml = r.short
+        ? `<div class="card-num"><b>${r.short}</b></div><div class="card-treat" id="treat-${id}">${r.sub}</div>`
+        : `<div class="card-num">치료실 <b>${id}</b></div><div class="card-treat" id="treat-${id}"></div>`;
+
+      card.innerHTML=`
+        <div class="card-left">
+          ${numHtml}
+          <div class="card-badge" id="badge-${id}">대기</div>
+        </div>
+        <div class="card-right">
+          <div class="card-endtime" id="end-${id}"></div>
+          <div class="card-remain" id="remain-${id}">--:--</div>
+        </div>
+        <div class="card-prog"><div class="card-prog-fill" id="prog-${id}" style="width:100%"></div></div>
+      `;
+      list.appendChild(card);
+    });
+  });
+}
+build();
+
+// ── 카드 클릭 ──
+function onCardClick(id,type){
+  if(state[id].status==='done'){ dismissRoom(id); return; }
+  openModal(id,type);
+}
+
+// ── 모달 ──
+function getBtnType(type){
+  if(type==='traction') return 'traction';
+  if(type==='cpm-lt'||type==='cpm-rt') return 'cpm';
+  return 'elec';
+}
+function getAccent(type){
+  if(type==='traction') return '#10b981';
+  if(type==='cpm-lt') return '#a78bfa';
+  if(type==='cpm-rt') return '#fb923c';
+  return '#3b82f6';
+}
+function getRoomLabel(id){
+  if(id==='lt-cpm') return 'Lt Shoulder CPM';
+  if(id==='rt-cpm') return 'Rt Shoulder CPM';
+  if(id==='tr-8') return '8번 Traction';
+  if(id==='tr-9') return '9번 Traction';
+  return `${id}번 치료실`;
+}
+
+let currentType=null;
+function openModal(id,type){
+  currentRoom=id; currentType=type;
+  const s=state[id];
+  const accent=getAccent(type);
+  document.getElementById('modalTitle').textContent=getRoomLabel(id);
+  document.getElementById('modalTitle').style.color=accent;
+  const sub=document.getElementById('modalSub');
+  const stopBtn=document.getElementById('stopBtn');
+  if(s.status==='running'||s.status==='warning'){
+    sub.textContent='진행중 — 새 시간 선택 시 재시작';
+    stopBtn.textContent='중지'; stopBtn.style.display='block';
+  } else {
+    sub.textContent='치료 시간을 선택하세요'; stopBtn.style.display='none';
+  }
+  editMode=false;
+  renderModalBtns(type,accent);
+  // 슬라이더 색
+  document.getElementById('dragFill').style.background=accent;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); currentRoom=null; currentType=null; }
+document.getElementById('modalOverlay').addEventListener('click',function(e){ if(e.target===this)closeModal(); });
+
+function renderModalBtns(type,accent){
+  const btype=getBtnType(type||currentType);
+  const btnList=btns[btype];
+  const wrap=document.getElementById('modalBtns');
+  wrap.innerHTML='';
+  wrap.style.gridTemplateColumns=btnList.length===1?'1fr':'1fr 1fr';
+  btnList.forEach((b,i)=>{
+    const el=document.createElement('button');
+    el.className='time-btn'+(editMode?' editing':'');
+    el.style.borderColor=editMode?'#f59e0b':(accent||getAccent(currentType));
+    el.innerHTML=`${b.min}<span>분 · ${b.label}</span>${editMode?'<div class="edit-hint-badge">편집</div>':''}`;
+    el.onclick=editMode?()=>openEditPopup(btype,i):()=>startTimer(b.min,b.label);
+    wrap.appendChild(el);
+  });
+  document.getElementById('editTip').style.display=editMode?'block':'none';
+  document.getElementById('editModeBtn').textContent=editMode?'✅ 완료':'✏️ 편집';
+}
+function toggleEditMode(){ editMode=!editMode; renderModalBtns(currentType,getAccent(currentType)); }
+
+// ── 편집 팝업 ──
+function openEditPopup(btype,idx){
+  editingType=btype; editingIdx=idx;
+  document.getElementById('editMin').value=btns[btype][idx].min;
+  document.getElementById('editLabel').value=btns[btype][idx].label;
+  document.getElementById('editPopup').classList.add('open');
+}
+function closeEditPopup(){ document.getElementById('editPopup').classList.remove('open'); }
+function saveEdit(){
+  const min=parseInt(document.getElementById('editMin').value);
+  const label=document.getElementById('editLabel').value.trim();
+  if(!min||min<1||!label)return;
+  btns[editingType][editingIdx]={min,label};
+  saveBtns(editingType,btns[editingType]);
+  closeEditPopup();
+  renderModalBtns(currentType,getAccent(currentType));
+}
+
+// ── 타이머 ──
+function startTimer(minutes,label){
+  if(currentRoom===null)return;
+  const id=currentRoom,s=state[id];
+  clearRoomTimers(s);
+  s.totalSecs=minutes*60;
+  s.endEpoch=Date.now()+s.totalSecs*1000;
+  s.overSecs=0;
+  s.treatLabel=label||`${minutes}분`;
+  s.status='running';
+  tickRoom(id); saveState(); closeModal();
+}
+function startDragTimer(){ startTimer(dragVal,`${dragVal}분`); }
+function stopTimer(){ if(currentRoom===null)return; dismissRoom(currentRoom); closeModal(); }
+
+function clearRoomTimers(s){
+  if(s.rafId)cancelAnimationFrame(s.rafId);
+  if(s.vibId)clearInterval(s.vibId);
+  s.rafId=null; s.vibId=null;
+}
+
+function tickRoom(id){
+  const s=state[id];
+  if(s.rafId)cancelAnimationFrame(s.rafId);
+  function loop(){
+    const now=Date.now();
+    if(s.status==='done'){
+      s.overSecs=Math.floor((now-s.endEpoch)/1000);
+      updateCard(id); s.rafId=requestAnimationFrame(loop); return;
+    }
+    const remain=Math.max(0,Math.ceil((s.endEpoch-now)/1000));
+    if(remain<=0){
+      s.status='done'; s.overSecs=0;
+      updateCard(id); triggerDone(id);
+    } else {
+      s.status=remain<=WARN_SECS?'warning':'running';
+      updateCard(id);
+    }
+    s.rafId=requestAnimationFrame(loop);
+  }
+  s.rafId=requestAnimationFrame(loop);
+}
+
+function updateCard(id){
+  const s=state[id];
+  const card=document.getElementById(`card-${id}`);
+  if(!card)return;
+  const sec=SECTIONS.flatMap(s=>s.rooms).find(r=>r.id===id);
+  const type=sec?sec.type:'elec';
+  card.className=`card ${type} ${s.status}`;
+
+  const remain=document.getElementById(`remain-${id}`);
+  const endEl=document.getElementById(`end-${id}`);
+  const badge=document.getElementById(`badge-${id}`);
+  const prog=document.getElementById(`prog-${id}`);
+  const treat=document.getElementById(`treat-${id}`);
+
+  if(s.status==='idle'){
+    remain.textContent='--:--'; endEl.textContent=''; badge.textContent='대기'; prog.style.width='100%';
+    if(treat&&!sec?.short) treat.textContent='';
+    return;
+  }
+  if(treat&&!sec?.short) treat.textContent=s.treatLabel||'';
+
+  if(s.endEpoch){
+    const et=new Date(s.endEpoch);
+    const eh=String(et.getHours()).padStart(2,'0'),em=String(et.getMinutes()).padStart(2,'0');
+    endEl.textContent=s.status==='done'?`종료 ${eh}:${em}`:`~${eh}:${em}`;
+  }
+  if(s.status==='done'){
+    const om=Math.floor(s.overSecs/60),os=s.overSecs%60;
+    remain.textContent=`-${String(om).padStart(2,'0')}:${String(os).padStart(2,'0')}`;
+    badge.textContent='완료!'; prog.style.width='0%'; return;
+  }
+  const r=Math.max(0,Math.ceil((s.endEpoch-Date.now())/1000));
+  remain.textContent=`${String(Math.floor(r/60)).padStart(2,'0')}:${String(r%60).padStart(2,'0')}`;
+  badge.textContent=s.status==='warning'?'곧 종료':'치료중';
+  prog.style.width=s.totalSecs>0?(r/s.totalSecs*100)+'%':'0%';
+}
+
+function triggerDone(id){
+  if(vibrationOn&&navigator.vibrate) navigator.vibrate([500,200,500,200,500]);
+  if(!ALL_ROOMS.includes(id))return;
+  renderQueue(); updateCard(id);
+}
+
+function dismissRoom(id){
+  const s=state[id];
+  clearRoomTimers(s);
+  s.endEpoch=null; s.totalSecs=0; s.overSecs=0; s.treatLabel=''; s.status='idle';
+  updateCard(id); saveState(); renderQueue();
+}
+
+// ── 큐 ──
+function renderQueue(){
+  const list=document.getElementById('queueList');
+  const empty=document.getElementById('queueEmpty');
+  list.querySelectorAll('.queue-item').forEach(e=>e.remove());
+  const active=ALL_ROOMS.filter(id=>state[id].status!=='idle'&&state[id].endEpoch)
+    .sort((a,b)=>state[a].endEpoch-state[b].endEpoch);
+  empty.style.display=active.length?'none':'block';
+  active.forEach((id,i)=>{
+    const s=state[id];
+    const isDone=s.status==='done';
+    const lbl=id==='lt-cpm'?'Lt CPM':id==='rt-cpm'?'Rt CPM':id==='tr-8'?'8 Tr':id==='tr-9'?'9 Tr':`${id}번`;
+    const et=new Date(s.endEpoch);
+    const etStr=`${String(et.getHours()).padStart(2,'0')}:${String(et.getMinutes()).padStart(2,'0')}`;
+    const item=document.createElement('div');
+    item.className='queue-item'+(isDone?'':' queue-item-running');
+    if(isDone)item.onclick=()=>dismissRoom(id);
+    item.innerHTML=`
+      <div class="queue-item-left">
+        <div class="queue-rank">${i+1}위</div>
+        <div class="queue-num">${lbl}</div>
+      </div>
+      <div class="queue-over ${isDone?'':'running-time'}" id="qover-${id}">${isDone?'-00:00':etStr}</div>
+    `;
+    list.appendChild(item);
+  });
+}
+setInterval(()=>{
+  ALL_ROOMS.filter(id=>state[id].status==='done').forEach(id=>{
+    const el=document.getElementById(`qover-${id}`);
+    if(!el)return;
+    const s=state[id];
+    el.textContent=`-${String(Math.floor(s.overSecs/60)).padStart(2,'0')}:${String(s.overSecs%60).padStart(2,'0')}`;
+  });
+},1000);
+setInterval(renderQueue,1000);
+
+// ── 포그라운드 복귀 ──
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible')return;
+  const now=Date.now();
+  ALL_ROOMS.forEach(id=>{
+    const s=state[id];
+    if(s.status==='idle'||!s.endEpoch)return;
+    if(s.status!=='done'&&now>=s.endEpoch){
+      s.status='done'; s.overSecs=Math.floor((now-s.endEpoch)/1000);
+      if(vibrationOn&&navigator.vibrate)navigator.vibrate([500,200,500,200,500]);
+      renderQueue();
+    }
+    if(s.status!=='idle')tickRoom(id);
+  });
+  saveState();
+});
+
+// ── 드래그 슬라이더 ──
+(function(){
+  const track=document.getElementById('dragTrack');
+  let sx=null,sv=null;
+  function setV(v){
+    dragVal=Math.min(99,Math.max(1,Math.round(v)));
+    const pct=(dragVal-1)/98;
+    document.getElementById('dragVal').textContent=dragVal;
+    document.getElementById('dragFill').style.width=(pct*100)+'%';
+    document.getElementById('dragThumb').style.left=(pct*100)+'%';
+  }
+  function cx(e){return e.touches?e.touches[0].clientX:e.clientX;}
+  function onS(e){e.preventDefault();sx=cx(e);sv=dragVal;
+    document.addEventListener('mousemove',onM);document.addEventListener('touchmove',onM,{passive:false});
+    document.addEventListener('mouseup',onE);document.addEventListener('touchend',onE);}
+  function onM(e){if(sx===null)return;e.preventDefault();
+    const tw=track.getBoundingClientRect().width||100;
+    setV(sv+(cx(e)-sx)/tw*98);}
+  function onE(){sx=null;document.removeEventListener('mousemove',onM);
+    document.removeEventListener('touchmove',onM);document.removeEventListener('mouseup',onE);
+    document.removeEventListener('touchend',onE);}
+  track.addEventListener('mousedown',onS);
+  track.addEventListener('touchstart',onS,{passive:false});
+  setV(10);
+})();
+
+// ── 시계 ──
+setInterval(()=>{
+  const n=new Date();
+  document.getElementById('clock').textContent=
+    `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
+},1000);
+
+restoreState();
+</script>
+</body>
+</html>
